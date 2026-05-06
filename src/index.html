@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="QuickCut">
+  <meta name="theme-color" content="#09090b">
+  <title>QuickCut Log</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+  <!-- Tailwind play CDN for development. Build replaces with compiled CSS. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- <link rel="stylesheet" href="css/app.css"> -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"DM Sans"', 'sans-serif'], mono: ['"JetBrains Mono"', 'monospace'] },
+          colors: { accent: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' } },
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
+      padding: 0
+    }
+
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none
+    }
+
+    input[type=date]::-webkit-calendar-picker-indicator {
+      filter: invert(.5)
+    }
+
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 0px)
+    }
+
+    /* Screen switching */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0, 0, 0, .75);
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto
+    }
+
+    .modal-sheet {
+      width: 100%;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform .32s cubic-bezier(.34, 1.48, .64, 1)
+    }
+
+    .modal-overlay.open .modal-sheet {
+      transform: translateY(0)
+    }
+
+    /* Nav item */
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all .15s;
+      flex: 1;
+      min-width: 0
+    }
+
+    .nav-item svg {
+      stroke: #71717a;
+      fill: none;
+      stroke-width: 1.8;
+      transition: stroke .15s
+    }
+
+    .nav-item .nav-lbl {
+      font-size: 10px;
+      color: #71717a;
+      font-weight: 500
+    }
+
+    .nav-item.active svg {
+      stroke: #fbbf24
+    }
+
+    .nav-item.active .nav-lbl {
+      color: #fbbf24
+    }
+
+    .dark .nav-item svg {
+      stroke: #71717a
+    }
+
+    .dark .nav-item.active svg {
+      stroke: #fbbf24
+    }
+
+    /* Service btn */
+    .srv-btn-item {
+      padding: 14px 12px;
+      border-radius: 12px;
+      border: 2px solid;
+      cursor: pointer;
+      text-align: left;
+      transition: all .15s;
+      font-family: inherit
+    }
+
+    .srv-btn-item:active {
+      transform: scale(.96)
+    }
+
+    /* Bar chart */
+    .bar-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 1
+    }
+
+    .bar-track {
+      width: 100%;
+      background: rgba(255, 255, 255, .08);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      height: 100%
+    }
+
+    .dark .bar-track {
+      background: rgba(255, 255, 255, .08)
+    }
+
+    /* Filter chip */
+    .filter-chip {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all .15s;
+      font-family: inherit
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 88px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: all .3s ease;
+      white-space: nowrap;
+      max-width: 90vw
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0)
+    }
+
+    /* Img viewer */
+    #img-viewer {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .95);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px
+    }
+
+    #img-viewer.open {
+      display: flex
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 3px
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 3px
+    }
+
+    /* Safe area nav */
+    .safe-nav {
+      height: max(72px, calc(56px + env(safe-area-inset-bottom, 0px)));
+      padding-bottom: env(safe-area-inset-bottom, 0px)
+    }
+
+    /* Photo thumbnail in add modal */
+    .photo-thumb-wrap {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      flex-shrink: 0
+    }
+
+    .photo-thumb-wrap img {
+      width: 72px;
+      height: 72px;
+      object-fit: cover;
+      border-radius: 10px
+    }
+
+    .photo-thumb-wrap button {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ef4444;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #fff;
+      font-weight: bold
+    }
+
+    /* Pulse animation */
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1)
+      }
+
+      50% {
+        transform: scale(1.04)
+      }
+    }
+
+    .pulse {
+      animation: pulse 2s infinite
+    }
+
+    /* Slide animations */
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%)
+      }
+
+      to {
+        transform: translateY(0)
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0
+      }
+
+      to {
+        opacity: 1
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-zinc-950 dark:bg-zinc-950 text-zinc-100 font-sans">
+
+  <div id="app" class="fixed inset-0 flex flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+
+    <!-- ============================================================ -->
+    <!-- SCREEN: HOME                                                 -->
+    <!-- ============================================================ -->
+    <div class="screen active" id="screen-home">
+      <!-- Header -->
+      <header
+        class="shrink-0 h-11 flex items-center justify-between px-5 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+        <span class="text-base font-bold"
+          style="background:linear-gradient(135deg,#fbbf24,#f43f5e);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✂
+          QuickCut</span>
+        <div class="flex items-center gap-3">
+          <button id="theme-btn-home" onclick="APP.toggleTheme()"
+            class="text-zinc-400 hover:text-zinc-200 dark:hover:text-zinc-200 transition-colors text-base leading-none"
+            title="Đổi theme">
+            <span class="theme-icon">☀️</span>
+          </button>
+          <span class="font-mono text-sm text-zinc-400" id="clock-home">--:--</span>
+        </div>
+      </header>
+
+      <!-- Scrollable content -->
+      <div class="flex-1 overflow-y-auto overflow-x-hidden"
+        style="-webkit-overflow-scrolling:touch;padding-bottom:88px">
+        <!-- Date header -->
+        <div class="px-4 pt-4 pb-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+          <p class="text-xs text-zinc-400 font-medium mb-0.5">Hôm nay</p>
+          <p class="text-xl font-bold text-zinc-900 dark:text-zinc-100" id="home-date">--</p>
+        </div>
+
+        <!-- Stats grid -->
+        <div class="grid grid-cols-2 gap-3 p-4">
+          <div
+            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 cursor-pointer active:scale-[.97] transition-transform"
+            onclick="APP.showScreen('summary')">
+            <p class="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider mb-2">Doanh thu</p>
+            <p class="text-2xl font-bold font-mono text-amber-500 dark:text-amber-400" id="stat-revenue">0đ</p>
+            <p class="text-[11px] text-zinc-400 mt-1" id="stat-revenue-sub">Chưa có khách</p>
+          </div>
+          <div
+            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 cursor-pointer active:scale-[.97] transition-transform"
+            onclick="APP.showScreen('summary')">
+            <p class="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider mb-2">Lượt khách</p>
+            <p class="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100" id="stat-count">0</p>
+            <p class="text-[11px] text-zinc-400 mt-1">hôm nay</p>
+          </div>
+          <div
+            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 cursor-pointer active:scale-[.97] transition-transform col-span-2"
+            onclick="APP.showScreen('summary')">
+            <p class="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider mb-2">Trung bình / khách</p>
+            <p class="text-2xl font-bold font-mono text-emerald-500 dark:text-emerald-400" id="stat-avg">0đ</p>
+          </div>
+        </div>
+
+        <!-- Add button -->
+        <div class="px-4 pb-2">
+          <button id="add-btn" onclick="APP.openAddModal()"
+            class="pulse w-full bg-amber-400 hover:bg-amber-500 active:bg-amber-600 text-zinc-900 font-bold rounded-2xl py-[18px] text-[17px] flex items-center justify-center gap-2.5 transition-[background,transform] active:scale-[.98]">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Thêm khách mới
+          </button>
+        </div>
+
+        <!-- Recent sessions -->
+        <div class="flex items-center justify-between px-4 pt-4 pb-2">
+          <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Gần đây</p>
+          <button class="text-xs text-amber-500 dark:text-amber-400 font-medium" onclick="APP.showScreen('history')">Xem
+            tất cả →</button>
+        </div>
+        <div id="recent-list"></div>
+      </div>
+
+      <!-- Nav bar -->
+      <nav
+        class="shrink-0 safe-nav flex items-start justify-around px-2 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pt-3">
+        <div class="nav-item active" onclick="APP.showScreen('home')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg><span class="nav-lbl">Trang chủ</span></div>
+        <div class="nav-item" onclick="APP.showScreen('history')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg><span class="nav-lbl">Lịch sử</span></div>
+        <div class="nav-item" onclick="APP.showScreen('summary')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg><span class="nav-lbl">Thống kê</span></div>
+        <div class="nav-item" onclick="APP.showScreen('settings')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg><span class="nav-lbl">Cài đặt</span></div>
+      </nav>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SCREEN: HISTORY                                              -->
+    <!-- ============================================================ -->
+    <div class="screen" id="screen-history">
+      <header
+        class="shrink-0 h-11 flex items-center justify-between px-5 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+        <span class="text-base font-bold"
+          style="background:linear-gradient(135deg,#fbbf24,#f43f5e);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✂
+          QuickCut</span>
+        <div class="flex items-center gap-3">
+          <button id="theme-btn-history" onclick="APP.toggleTheme()"
+            class="text-zinc-400 hover:text-zinc-200 transition-colors text-base leading-none"><span
+              class="theme-icon">☀️</span></button>
+          <span class="font-mono text-sm text-zinc-400" id="clock-history">--:--</span>
+        </div>
+      </header>
+      <div
+        class="flex gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto"
+        style="scrollbar-width:none" id="filter-bar"></div>
+      <div class="flex-1 overflow-y-auto" style="-webkit-overflow-scrolling:touch;padding-bottom:88px">
+        <div id="history-list"></div>
+      </div>
+      <nav
+        class="shrink-0 safe-nav flex items-start justify-around px-2 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pt-3">
+        <div class="nav-item" onclick="APP.showScreen('home')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg><span class="nav-lbl">Trang chủ</span></div>
+        <div class="nav-item active" onclick="APP.showScreen('history')"><svg width="22" height="22"
+            viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg><span class="nav-lbl">Lịch sử</span></div>
+        <div class="nav-item" onclick="APP.showScreen('summary')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg><span class="nav-lbl">Thống kê</span></div>
+        <div class="nav-item" onclick="APP.showScreen('settings')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg><span class="nav-lbl">Cài đặt</span></div>
+      </nav>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SCREEN: SUMMARY                                              -->
+    <!-- ============================================================ -->
+    <div class="screen" id="screen-summary">
+      <header
+        class="shrink-0 h-11 flex items-center justify-between px-5 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+        <span class="text-base font-bold"
+          style="background:linear-gradient(135deg,#fbbf24,#f43f5e);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✂
+          QuickCut</span>
+        <div class="flex items-center gap-3">
+          <button id="theme-btn-summary" onclick="APP.toggleTheme()"
+            class="text-zinc-400 hover:text-zinc-200 transition-colors text-base leading-none"><span
+              class="theme-icon">☀️</span></button>
+          <span class="font-mono text-sm text-zinc-400" id="clock-summary">--:--</span>
+        </div>
+      </header>
+      <div class="flex-1 overflow-y-auto" style="-webkit-overflow-scrolling:touch;padding-bottom:88px">
+        <!-- Tab bar -->
+        <div class="flex gap-1 p-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+          <button id="tab-day" onclick="APP.switchSummaryTab('day')"
+            class="px-4 py-2 text-sm font-medium rounded-lg text-zinc-500 dark:text-zinc-400 cursor-pointer transition-all">Theo
+            ngày</button>
+          <button id="tab-month" onclick="APP.switchSummaryTab('month')"
+            class="px-4 py-2 text-sm font-medium rounded-lg text-zinc-500 dark:text-zinc-400 cursor-pointer transition-all">Theo
+            tháng</button>
+          <button id="tab-service" onclick="APP.switchSummaryTab('service')"
+            class="px-4 py-2 text-sm font-medium rounded-lg text-zinc-500 dark:text-zinc-400 cursor-pointer transition-all">Dịch
+            vụ</button>
+        </div>
+        <div id="summary-content" class="p-4"></div>
+      </div>
+      <nav
+        class="shrink-0 safe-nav flex items-start justify-around px-2 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pt-3">
+        <div class="nav-item" onclick="APP.showScreen('home')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg><span class="nav-lbl">Trang chủ</span></div>
+        <div class="nav-item" onclick="APP.showScreen('history')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg><span class="nav-lbl">Lịch sử</span></div>
+        <div class="nav-item active" onclick="APP.showScreen('summary')"><svg width="22" height="22"
+            viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg><span class="nav-lbl">Thống kê</span></div>
+        <div class="nav-item" onclick="APP.showScreen('settings')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg><span class="nav-lbl">Cài đặt</span></div>
+      </nav>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SCREEN: SETTINGS                                             -->
+    <!-- ============================================================ -->
+    <div class="screen" id="screen-settings">
+      <header
+        class="shrink-0 h-11 flex items-center justify-between px-5 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
+        <span class="text-base font-bold"
+          style="background:linear-gradient(135deg,#fbbf24,#f43f5e);-webkit-background-clip:text;-webkit-text-fill-color:transparent">✂
+          QuickCut</span>
+        <div class="flex items-center gap-3">
+          <button id="theme-btn-settings" onclick="APP.toggleTheme()"
+            class="text-zinc-400 hover:text-zinc-200 transition-colors text-base leading-none"><span
+              class="theme-icon">☀️</span></button>
+          <span class="font-mono text-sm text-zinc-400" id="clock-settings">--:--</span>
+        </div>
+      </header>
+      <div class="flex-1 overflow-y-auto" style="-webkit-overflow-scrolling:touch;padding-bottom:88px">
+
+        <!-- Services section -->
+        <div class="p-4 pb-1">
+          <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Dịch vụ</p>
+          <div
+            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div
+              class="flex items-center gap-3 p-4 border-b border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+              onclick="APP.openServiceModal()">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-amber-50 dark:bg-amber-400/10">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="1.8">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                  <path d="M16 3.13a4 4 0 010 7.75" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Quản lý dịch vụ</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Thêm, sửa, xóa dịch vụ</p>
+              </div>
+              <span class="text-zinc-400">›</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data section -->
+        <div class="p-4 pb-1">
+          <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Lượt khách</p>
+          <div
+            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div
+              class="flex items-center gap-3 p-4 border-b border-zinc-100 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+              onclick="APP.exportSessions()">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-blue-50 dark:bg-blue-500/10">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="1.8">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Sao lưu lượt khách</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Xuất file JSON backup</p>
+              </div>
+              <span class="text-zinc-400">›</span>
+            </div>
+            <div
+              class="flex items-center gap-3 p-4 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+              onclick="APP.importSessions()">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-500/10">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.8">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Khôi phục lượt khách</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Nhập từ file backup</p>
+              </div>
+              <span class="text-zinc-400">›</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="p-4 pb-1">
+          <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Nguy hiểm</p>
+          <div
+            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div
+              class="flex items-center gap-3 p-4 cursor-pointer hover:bg-red-50 dark:hover:bg-red-500/5 transition-colors"
+              onclick="APP.clearAllData()">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-red-50 dark:bg-red-500/10">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.8">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4h6v2" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm font-semibold text-red-500">Xóa tất cả dữ liệu</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Không thể hoàn tác</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- App info -->
+        <div class="p-4">
+          <p class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Thông tin</p>
+          <div
+            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div class="flex items-center gap-3 p-4">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center bg-zinc-100 dark:bg-zinc-800">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">QuickCut Log v2.0</p>
+                <p class="text-xs text-zinc-400 mt-0.5">Offline 100% • IndexedDB</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <nav
+        class="shrink-0 safe-nav flex items-start justify-around px-2 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 pt-3">
+        <div class="nav-item" onclick="APP.showScreen('home')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg><span class="nav-lbl">Trang chủ</span></div>
+        <div class="nav-item" onclick="APP.showScreen('history')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg><span class="nav-lbl">Lịch sử</span></div>
+        <div class="nav-item" onclick="APP.showScreen('summary')"><svg width="22" height="22" viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg><span class="nav-lbl">Thống kê</span></div>
+        <div class="nav-item active" onclick="APP.showScreen('settings')"><svg width="22" height="22"
+            viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg><span class="nav-lbl">Cài đặt</span></div>
+      </nav>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL: ADD SESSION (with photo)                              -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="add-modal">
+      <div class="modal-sheet bg-white dark:bg-zinc-900 rounded-t-3xl">
+        <div class="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mt-3 shrink-0"></div>
+        <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+          <h2 class="text-[17px] font-bold text-zinc-900 dark:text-zinc-100">Thêm lượt khách</h2>
+          <button onclick="APP.closeAddModal()"
+            class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">✕</button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-5 py-4" style="-webkit-overflow-scrolling:touch">
+          <!-- Service section -->
+          <p class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Dịch vụ</p>
+          <div class="grid grid-cols-2 gap-2.5 mb-5" id="add-service-grid"></div>
+
+          <!-- Photo section -->
+          <p class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Ảnh kiểu tóc <span
+              class="normal-case font-normal">(tùy chọn)</span></p>
+          <div class="flex gap-2.5 overflow-x-auto mb-5 pb-1" id="add-photo-row" style="scrollbar-width:none">
+            <label
+              class="flex flex-col items-center justify-center gap-2 w-[72px] h-[72px] shrink-0 rounded-[10px] border-2 border-dashed border-zinc-200 dark:border-zinc-700 cursor-pointer hover:border-amber-400 transition-colors bg-zinc-50 dark:bg-zinc-800/50 text-zinc-400 text-xs font-medium">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              Thêm
+              <input type="file" id="add-photo-input" accept="image/*" multiple style="display:none"
+                onchange="APP.handleAddPhoto(event)">
+            </label>
+          </div>
+
+          <!-- Total -->
+          <div class="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 mb-4">
+            <span class="text-sm text-zinc-500 dark:text-zinc-400">Tổng tiền</span>
+            <span class="text-2xl font-bold font-mono text-emerald-500 dark:text-emerald-400" id="add-total">0đ</span>
+          </div>
+
+          <!-- Save -->
+          <button id="add-save-btn" onclick="APP.saveSession()" disabled
+            class="w-full bg-amber-400 text-zinc-900 font-bold rounded-xl py-4 text-base transition-[background,transform,opacity] active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed">
+            Lưu lượt khách
+          </button>
+          <div class="h-4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL: DETAIL                                                -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="detail-modal" style="z-index:60">
+      <div class="modal-sheet bg-white dark:bg-zinc-900 rounded-t-3xl">
+        <div class="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mt-3 shrink-0"></div>
+        <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+          <h2 class="text-[17px] font-bold text-zinc-900 dark:text-zinc-100" id="detail-title">Chi tiết</h2>
+          <button onclick="APP.closeDetailModal()"
+            class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">✕</button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-5 py-4 pb-6" style="-webkit-overflow-scrolling:touch" id="detail-body">
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL: EDIT SESSION                                          -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="edit-modal" style="z-index:70">
+      <div class="modal-sheet bg-white dark:bg-zinc-900 rounded-t-3xl">
+        <div class="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mt-3 shrink-0"></div>
+        <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+          <h2 class="text-[17px] font-bold text-zinc-900 dark:text-zinc-100">Sửa lượt khách</h2>
+          <button onclick="APP.closeEditModal()"
+            class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">✕</button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-5 py-4" style="-webkit-overflow-scrolling:touch">
+          <p class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">Ngày & Giờ</p>
+          <div class="flex gap-2 mb-5">
+            <input type="date" id="edit-date"
+              class="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-400">
+            <input type="time" id="edit-time"
+              class="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-400">
+          </div>
+          <p class="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Dịch vụ</p>
+          <div class="grid grid-cols-2 gap-2.5 mb-4" id="edit-service-grid"></div>
+          <div class="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/60 rounded-xl p-4 mb-4">
+            <span class="text-sm text-zinc-500 dark:text-zinc-400">Tổng tiền</span>
+            <span class="text-2xl font-bold font-mono text-emerald-500 dark:text-emerald-400" id="edit-total">0đ</span>
+          </div>
+          <button onclick="APP.saveEditSession()"
+            class="w-full bg-amber-400 text-zinc-900 font-bold rounded-xl py-4 text-base transition-[background,transform] active:scale-[.98]">Lưu
+            thay đổi</button>
+          <div class="h-4"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL: MANAGE SERVICES                                       -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="service-modal" style="z-index:80">
+      <div class="modal-sheet bg-white dark:bg-zinc-900 rounded-t-3xl" style="max-height:85vh">
+        <div class="w-10 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full mx-auto mt-3 shrink-0"></div>
+        <div class="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+          <h2 class="text-[17px] font-bold text-zinc-900 dark:text-zinc-100">Quản lý dịch vụ</h2>
+          <button onclick="APP.closeServiceModal()"
+            class="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">✕</button>
+        </div>
+
+        <!-- Export/Import services -->
+        <div class="flex gap-2 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 shrink-0">
+          <button onclick="APP.exportServices()"
+            class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-500/10 rounded-xl">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Xuất backup
+          </button>
+          <button onclick="APP.importServices()"
+            class="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Nhập backup
+          </button>
+        </div>
+
+        <!-- Services list -->
+        <div class="flex-1 overflow-y-auto" style="-webkit-overflow-scrolling:touch">
+          <div id="service-manage-list" class="px-4 pt-3"></div>
+          <!-- Add service form -->
+          <div class="flex gap-2 px-4 py-3 border-t border-zinc-100 dark:border-zinc-800">
+            <input type="text" id="new-srv-name" placeholder="Tên dịch vụ" maxlength="24"
+              class="flex-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-amber-400">
+            <input type="number" id="new-srv-price" placeholder="Giá (k)" min="0"
+              class="w-20 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-amber-400">
+            <button onclick="APP.addService()"
+              class="px-4 py-2.5 bg-amber-400 text-zinc-900 font-bold text-sm rounded-xl whitespace-nowrap">Thêm</button>
+          </div>
+          <div class="h-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- IMAGE VIEWER                                                 -->
+    <!-- ============================================================ -->
+    <div id="img-viewer">
+      <button onclick="APP.closeImgViewer()"
+        class="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white text-xl z-10">✕</button>
+      <img id="img-viewer-img" src="" alt=""
+        style="max-width:100%;max-height:80vh;object-fit:contain;border-radius:12px">
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast"
+      class="px-5 py-3 rounded-2xl bg-zinc-800 dark:bg-zinc-700 border border-zinc-700 dark:border-zinc-600 text-sm font-medium text-zinc-100">
+    </div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="import-sessions-input" accept=".json" style="display:none"
+      onchange="APP.handleImportSessions(event)">
+    <input type="file" id="import-services-input" accept=".json" style="display:none"
+      onchange="APP.handleImportServices(event)">
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>
