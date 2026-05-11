@@ -27,15 +27,7 @@ export const state = {
 };
 
 export const DEFAULT_SERVICES = [
-  // { id: 'default-1', name: 'Cắt tóc', price: 50000 },
-  // { id: 'default-2', name: 'Gội đầu', price: 20000 },
-  // { id: 'default-3', name: 'Cạo râu', price: 30000 },
-  // { id: 'default-4', name: 'Nhuộm tóc', price: 150000 },
-  // { id: 'default-5', name: 'Uốn tóc', price: 200000 },
-
-  { id: 's1', name: 'Cắt tóc', price: 50000 },
-  { id: 's2', name: 'Gội đầu', price: 20000 },
-  { id: 's3', name: 'Cạo râu', price: 30000 },
-  { id: 's4', name: 'Nhuộm tóc', price: 150000 },
-  { id: 's5', name: 'Uốn tóc', price: 200000 },
+  { id: 'sv-01', name: 'Dịch vụ 1', price: 200000 },
+  { id: 'sv-02', name: 'Dịch vụ 2', price: 100000 },
+  { id: 'sv-03', name: 'Dịch vụ 3', price: 50000 }
 ];

@@ -5,6 +5,7 @@
 import { state } from '../state.js';
 import { fmtMoney, fmtTime, toDateKey, todayStr } from '../utils.js';
 import { openDetailModal } from '../components/detail.js';
+import { loadLazyImages } from '../components/lazy-img.js';
 
 export function renderHome() {
   // Date heading
@@ -48,6 +49,8 @@ export function renderHome() {
   list.querySelectorAll('[data-session-id]').forEach(el => {
     el.addEventListener('click', () => openDetailModal(el.dataset.sessionId));
   });
+
+  loadLazyImages();
 }
 
 export function sessionCardHTML(s) {
@@ -58,7 +61,6 @@ export function sessionCardHTML(s) {
     })
     .filter(Boolean)
     .join(', ');
-
   const thumb = s.imageIds && s.imageIds.length
     ? `<div class="w-12 h-12 rounded-xl bg-zinc-200 dark:bg-zinc-700 overflow-hidden shrink-0 flex items-center justify-center">
          <img src="" data-image-id="${s.imageIds[0]}" alt="" class="w-full h-full object-cover lazy-img">
