@@ -1,7 +1,7 @@
 {
-  "name": "quickcut-log",
-  "version": "2.0.0",
-  "description": "Ứng dụng quản lý tiệm cắt tóc - offline PWA",
+  "name": "quicknote-log",
+  "version": "2.0.1",
+  "description": "Ứng dụng quản lý lượt khách hàng - offline PWA",
   "scripts": {
     "dev": "npx serve src -l 3000",
     "build": "node build.js",

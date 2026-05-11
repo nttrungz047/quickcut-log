@@ -1,4 +1,4 @@
-# ✂ QuickCut Log v2.0
+# ⚡ QuickNote Log v2.0.1
 
 Ứng dụng quản lý tiệm cắt tóc — PWA offline 100%, không cần server.
 
